@@ -1,0 +1,11 @@
+{
+  "Port": 5060,
+  "LineCount": 2,
+  "PublicIP": "",
+  "UseTls": false,
+  "TlsPort": 5061,
+  "ValidateServerCert": false,
+  "SrtpMode": "none",
+  "TlsCertPath": "",
+  "TlsCertPassword": ""
+}
