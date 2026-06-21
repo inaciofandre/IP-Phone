@@ -38,6 +38,7 @@ namespace IP_Phone.Services
         private int _activeLineIndex;
         private readonly HashSet<string> _processedCallIds = new HashSet<string>();
         private readonly HashSet<string> _autoAnswerNumbers = new HashSet<string>();
+        private readonly Dictionary<int, AudioService> _audioServices = new Dictionary<int, AudioService>();
         // Phonebook service for directory-based number resolution and contact lookup.
         private PhonebookService _phonebook;
 
@@ -127,6 +128,7 @@ namespace IP_Phone.Services
 
             foreach (var line in _lines)
             {
+                StopAudio(line);
                 if (line.UserAgent.IsCallActive)
                     line.UserAgent.Hangup();
                 line.RtpSession?.Dispose();
@@ -507,6 +509,7 @@ namespace IP_Phone.Services
                 else
                 {
                     line.CallStartTime = DateTime.Now;
+                    StartAudio(line);
                     CliHelper.Event($"Line {line.Id}: Call answered");
                     _callHistoryService.Update(line.CallHistoryId, e =>
                     {
@@ -612,6 +615,7 @@ namespace IP_Phone.Services
                 }
 
                 CliHelper.Event($"Line {line.Id}: Call ended");
+                StopAudio(line);
                 StopRecording(line);
                 _callHistoryService.Update(line.CallHistoryId, e =>
                 {
@@ -676,6 +680,7 @@ namespace IP_Phone.Services
             line.RtpSession = rtpSession;
             line.CallStartTime = DateTime.Now;
             await line.UserAgent.Answer(uas, line.RtpSession);
+            StartAudio(line);
             uas = null;
         }
 
@@ -1051,6 +1056,7 @@ namespace IP_Phone.Services
 
             await line.UserAgent.Answer(line.PendingCallUAS, line.RtpSession);
             line.CallStartTime = DateTime.Now;
+            StartAudio(line);
             CliHelper.Event($"Line {line.Id}: === CALL ANSWERED ===");
             _callHistoryService.Update(line.CallHistoryId, e =>
             {
@@ -1110,6 +1116,30 @@ namespace IP_Phone.Services
 
             line.PendingCallUAS = null;
             line.PendingCallRequest = null;
+        }
+
+        /// <summary>Starts 2-way audio for a call line via NAudio (mic capture + speaker playback).</summary>
+        private void StartAudio(CallLine line)
+        {
+            if (line?.RtpSession == null) return;
+            if (_audioServices.TryGetValue(line.Id, out var old))
+            {
+                old.Dispose();
+                _audioServices.Remove(line.Id);
+            }
+            var svc = new AudioService();
+            svc.Start(line.RtpSession);
+            _audioServices[line.Id] = svc;
+        }
+
+        /// <summary>Stops 2-way audio for a call line and frees resources.</summary>
+        private void StopAudio(CallLine line)
+        {
+            if (line != null && _audioServices.TryGetValue(line.Id, out var svc))
+            {
+                svc.Dispose();
+                _audioServices.Remove(line.Id);
+            }
         }
 
         /// <summary>
