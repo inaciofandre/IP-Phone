@@ -106,4 +106,4 @@ msbuild Dialex.slnx /t:Build /p:Configuration=Release
 
 ## License
 
-GNU General Public License v2.0
+GNU Affero General Public License v3.0
